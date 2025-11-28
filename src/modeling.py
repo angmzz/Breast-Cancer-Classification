@@ -1,6 +1,7 @@
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.model_selection import cross_val_score
+from sklearn.svm import SVC
+from sklearn.model_selection import cross_val_score, GridSearchCV
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 import pandas as pd
 import numpy as np
@@ -19,7 +20,9 @@ def get_models(random_state: int = 42) -> Dict[str, Any]:
     return {
         'Logistic Regression': LogisticRegression(random_state=random_state),
         'Random Forest': RandomForestClassifier(random_state=random_state),
-        'Gradient Boosting': GradientBoostingClassifier(random_state=random_state)
+        'Gradient Boosting': GradientBoostingClassifier(random_state=random_state),
+        'SVM (Linear)': SVC(kernel='linear', probability=True, random_state=random_state),
+        'SVM (RBF)': SVC(kernel='rbf', probability=True, random_state=random_state)
     }
 
 def train_and_evaluate(models: Dict[str, Any], X_train: pd.DataFrame, y_train: pd.Series, 
@@ -41,7 +44,7 @@ def train_and_evaluate(models: Dict[str, Any], X_train: pd.DataFrame, y_train: p
     metrics_list = []
     results = {}
     
-    from src.processing import create_pipeline
+    from processing import create_pipeline
     
     for name, model in models.items():
         # Crear Pipeline
@@ -82,3 +85,22 @@ def train_and_evaluate(models: Dict[str, Any], X_train: pd.DataFrame, y_train: p
         }
         
     return pd.DataFrame(metrics_list), results
+
+def perform_grid_search(model: Any, param_grid: Dict[str, Any], X_train: pd.DataFrame, y_train: pd.Series, cv: int = 5) -> Tuple[Any, Dict[str, Any], Any]:
+    """
+    Realiza una búsqueda de cuadrícula (Grid Search) para optimizar hiperparámetros.
+    
+    Args:
+        model: El modelo o pipeline a optimizar.
+        param_grid: Diccionario con los nombres de los parámetros y listas de valores a probar.
+        X_train: Características de entrenamiento.
+        y_train: Objetivo de entrenamiento.
+        cv: Número de pliegues para validación cruzada.
+        
+    Returns:
+        Tuple: (Mejor Modelo, Mejores Parámetros, Objeto GridSearch completo)
+    """
+    grid_search = GridSearchCV(estimator=model, param_grid=param_grid, cv=cv, scoring='accuracy', n_jobs=-1, verbose=1)
+    grid_search.fit(X_train, y_train)
+    
+    return grid_search.best_estimator_, grid_search.best_params_, grid_search
