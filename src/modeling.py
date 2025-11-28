@@ -86,21 +86,65 @@ def train_and_evaluate(models: Dict[str, Any], X_train: pd.DataFrame, y_train: p
         
     return pd.DataFrame(metrics_list), results
 
-def perform_grid_search(model: Any, param_grid: Dict[str, Any], X_train: pd.DataFrame, y_train: pd.Series, cv: int = 5) -> Tuple[Any, Dict[str, Any], Any]:
+def perform_optuna_study(model_name: str, X_train: pd.DataFrame, y_train: pd.Series, n_trials: int = 50, cv: int = 5) -> Tuple[Any, Dict[str, Any], Any]:
     """
-    Realiza una búsqueda de cuadrícula (Grid Search) para optimizar hiperparámetros.
+    Realiza un estudio de Optuna para optimizar hiperparámetros.
     
     Args:
-        model: El modelo o pipeline a optimizar.
-        param_grid: Diccionario con los nombres de los parámetros y listas de valores a probar.
+        model_name: Nombre del modelo ('Logistic Regression', 'Random Forest', etc.).
         X_train: Características de entrenamiento.
         y_train: Objetivo de entrenamiento.
+        n_trials: Número de intentos (trials).
         cv: Número de pliegues para validación cruzada.
         
     Returns:
-        Tuple: (Mejor Modelo, Mejores Parámetros, Objeto GridSearch completo)
+        Tuple: (Mejor Modelo, Mejores Parámetros, Estudio de Optuna)
     """
-    grid_search = GridSearchCV(estimator=model, param_grid=param_grid, cv=cv, scoring='accuracy', n_jobs=-1, verbose=1)
-    grid_search.fit(X_train, y_train)
+    import optuna
+    from processing import create_pipeline
     
-    return grid_search.best_estimator_, grid_search.best_params_, grid_search
+    def objective(trial):
+        # Definir espacio de búsqueda según el modelo
+        if model_name == 'Logistic Regression':
+            params = {
+                'C': trial.suggest_float('C', 1e-4, 100, log=True),
+                'penalty': trial.suggest_categorical('penalty', ['l1', 'l2']),
+                'solver': 'liblinear'
+            }
+            model = LogisticRegression(random_state=42, **params)
+        else:
+            raise ValueError(f"Modelo '{model_name}' no soportado para optimización con Optuna.")
+
+        # Crear Pipeline
+        pipeline = create_pipeline(model)
+        
+        # Validación Cruzada
+        scores = cross_val_score(pipeline, X_train, y_train, cv=cv, scoring='accuracy', n_jobs=-1)
+        return scores.mean()
+
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+    study = optuna.create_study(direction='maximize')
+    study.optimize(objective, n_trials=n_trials)
+    
+    # Re-entrenar el mejor modelo
+    best_params = study.best_params
+    
+    # Reconstruir el modelo con los mejores parámetros (lógica duplicada necesaria para instanciar)
+    if model_name == 'Logistic Regression':
+        best_params['solver'] = 'liblinear' # Asegurar solver
+        best_model = LogisticRegression(random_state=42, **best_params)
+    elif model_name == 'Random Forest':
+        best_model = RandomForestClassifier(random_state=42, **best_params)
+    elif model_name == 'Gradient Boosting':
+        best_model = GradientBoostingClassifier(random_state=42, **best_params)
+    elif 'SVM' in model_name:
+        if 'Linear' in model_name: best_params['kernel'] = 'linear'
+        elif 'RBF' in model_name: best_params['kernel'] = 'rbf'
+        best_model = SVC(probability=True, random_state=42, **best_params)
+        
+    # Ajustar el mejor modelo con todos los datos de entrenamiento (usando pipeline)
+    from processing import create_pipeline
+    best_pipeline = create_pipeline(best_model)
+    best_pipeline.fit(X_train, y_train)
+    
+    return best_pipeline, best_params, study

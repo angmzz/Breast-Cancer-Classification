@@ -196,26 +196,4 @@ def plot_learning_curves(models: Dict[str, Any], X: pd.DataFrame, y: pd.Series, 
     plt.tight_layout()
     plt.show()
 
-def plot_grid_search_results(grid_result: Any):
-    """
-    Grafica un Heatmap del rendimiento de Grid Search para dos hiperparámetros.
-    
-    Args:
-        grid_result: Objeto GridSearchCV ajustado.
-    """
-    results_df = pd.DataFrame(grid_result.cv_results_)
-    params = grid_result.param_grid.keys()
-    param_list = list(params)
 
-    param1, param2 = param_list[0], param_list[1]
-    
-    # Pivotar los datos para el heatmap
-    heatmap_data = results_df.pivot(index=f'param_{param1}', columns=f'param_{param2}', values='mean_test_score')
-    
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(heatmap_data, annot=True, fmt='.3f', cmap='viridis', cbar_kws={'label': 'Accuracy'})
-    
-    plt.title('Rendimiento de Hiperparámetros (Grid Search)', fontsize=14, fontweight='bold')
-    plt.xlabel(param2)
-    plt.ylabel(param1)
-    plt.show()
