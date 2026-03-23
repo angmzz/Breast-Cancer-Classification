@@ -17,7 +17,7 @@ Priorizar la Sensibilidad (Recall) sobre la Precisi√≥n pura. En este contexto m√
 
 ### Clonar el Repositorio
 ```bash
-git clone https://github.com/angmzz/BreastCancerML.git
+git clone https://github.com/angmzz/Breast-Cancer-Classification
 cd Breast-Cancer-Classification
 ```
 
